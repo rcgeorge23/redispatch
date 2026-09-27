@@ -1,0 +1,117 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.gradleup.nmcp'
+}
+
+group = 'io.github.rcgeorge23'
+version = providers.gradleProperty('version').getOrElse('0.1.0-SNAPSHOT')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.boot:spring-boot-dependencies:4.1.1'
+    }
+}
+
+sourceSets {
+    integrationTest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    api 'com.fasterxml.jackson.core:jackson-databind'
+    api 'org.springframework.data:spring-data-redis'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    integrationTestImplementation 'io.lettuce:lettuce-core'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.register('integrationTest', Test) {
+    description = 'Runs integration tests against a real Redis server.'
+    group = 'verification'
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter(test)
+}
+
+tasks.named('check') {
+    dependsOn(tasks.named('integrationTest'))
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.addAll(['-Xlint:unchecked', '-Xlint:deprecation'])
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            pom {
+                name = 'Redispatch'
+                description = 'A small Redis Streams queue with at-least-once delivery and stale-message recovery.'
+                url = 'https://github.com/rcgeorge23/redispatch'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                        distribution = 'repo'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'rcgeorge23'
+                        name = 'Richard George'
+                        url = 'https://github.com/rcgeorge23'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/rcgeorge23/redispatch.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/rcgeorge23/redispatch.git'
+                    url = 'https://github.com/rcgeorge23/redispatch'
+                }
+            }
+        }
+    }
+}
+
+signing {
+    def signingKey = System.getenv('MAVEN_SIGNING_KEY')
+    def signingPassword = System.getenv('MAVEN_SIGNING_PASSWORD')
+    required = signingKey != null
+    if (signingKey != null) {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+    } else {
+        useGpgCmd()
+    }
+    sign publishing.publications.mavenJava
+}

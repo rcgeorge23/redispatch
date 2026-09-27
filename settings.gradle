@@ -1,0 +1,18 @@
+plugins {
+    id 'com.gradleup.nmcp.settings' version '1.6.2'
+}
+
+rootProject.name = 'redispatch'
+
+def centralUsername = System.getenv('MAVEN_CENTRAL_USERNAME')
+def centralPassword = System.getenv('MAVEN_CENTRAL_PASSWORD')
+
+if (centralUsername && centralPassword) {
+    nmcpSettings {
+        centralPortal {
+            username = centralUsername
+            password = centralPassword
+            publishingType = 'AUTOMATIC'
+        }
+    }
+}
